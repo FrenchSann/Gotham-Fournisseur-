@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Secrets : tout est ignoré, seul le modèle sans valeur est versionné.
 .env*
+!.env.example
 
 # vercel
 .vercel

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Une nouvelle poussée annule la vérification en cours sur la même branche.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Vérification
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        # Valeurs factices : le build ne doit dépendre d'aucun secret réel.
+        # Si un jour il en exige un, c'est que du code serveur s'exécute au
+        # build alors qu'il ne devrait pas — et la CI le révélera ici.
+        env:
+          NEXT_PUBLIC_SITE_URL: https://arsenalnoir.com
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
+        run: npm run build
+
+      - name: Audit des dépendances
+        run: npm audit --audit-level=high

@@ -1,26 +1,149 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ==========================================================================
+   ARSENAL NOIR — Jetons de design
+   Source de vérité : SPEC.md § 2 (Direction artistique) et § 2 bis (Mouvement).
+   Toute couleur, durée ou courbe utilisée ailleurs dans le site vient d'ici.
+   ========================================================================== */
+
+@theme {
+  /* --- Couleurs -----------------------------------------------------------
+     Contrastes vérifiés sur --void : bone 15.8:1, ash 6.9:1.
+     Blanc sur ember : 5.1:1. Tous au-dessus de WCAG AA. */
+  --color-void: #08090b; /* Fond de page */
+  --color-steel-900: #101317; /* Cartes, surfaces */
+  --color-steel-700: #1a1e24; /* Surfaces surélevées */
+  --color-steel-500: #2a3038; /* Bordures, filets */
+  --color-ash: #8a9099; /* Texte secondaire */
+  --color-bone: #e6e4e0; /* Texte principal */
+  --color-ember: #c1272d; /* Accent unique — max ~5 % de la surface visible */
+  --color-brass: #b8912f; /* Accent secondaire, rare */
+
+  /* --- Typographie --------------------------------------------------------
+     Les trois familles sont injectées par next/font dans layout.tsx. */
+  --font-titre: var(--police-titre), 'Arial Narrow', sans-serif;
+  --font-mono: var(--police-mono), ui-monospace, monospace;
+  --font-corps: var(--police-corps), system-ui, sans-serif;
+
+  /* --- Registre MACHINE : réponse à une action ----------------------------
+     Sec, rapide, sans rebond. Une interface lente paraît cassée. */
+  --duree-machine-court: 120ms;
+  --duree-machine: 160ms;
+  --duree-machine-long: 200ms;
+  --courbe-machine: cubic-bezier(0.2, 0, 0, 1);
+
+  /* --- Registre ATMOSPHERE : ambiance et défilement -----------------------
+     Lent, souvent en boucle. Une ambiance rapide paraît cheap. */
+  --duree-atmo-court: 800ms;
+  --duree-atmo: 1200ms;
+  --courbe-atmo: cubic-bezier(0.4, 0, 0.2, 1);
+  --cycle-brume: 48s;
+  --cycle-projecteur: 25s;
+  --cycle-balayage: 8s;
+  --cycle-grille: 60s;
+
+  /* --- Grille -------------------------------------------------------------
+     80px est le pas de la grille technique de fond ; tout s'y aligne. */
+  --pas-grille: 80px;
+  --filet: 1px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  /* Aucun coin arrondi nulle part. Règle dure du spec. */
+  border-radius: 0;
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  /* Lenis pilote le défilement sur la vitrine ; en reduced-motion ou si le
+     script échoue, on retombe sur le défilement natif du navigateur. */
+  scroll-behavior: auto;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-void);
+  color: var(--color-bone);
+  font-family: var(--font-corps);
+  font-size: 1rem;
+  line-height: 1.6;
+  /* Le fond animé est en position fixe derrière : pas de rebond de scroll. */
+  overscroll-behavior-y: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-titre);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+  text-wrap: balance;
+}
+
+p {
+  /* 68 caractères maximum : au-delà, l'œil perd la ligne suivante. */
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Étiquette technique : la signature « catalogue d'armurier ». */
+.etiquette {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ash);
+}
+
+/* ==========================================================================
+   Accessibilité
+   ========================================================================== */
+
+:focus-visible {
+  outline: 2px solid var(--color-ember);
+  outline-offset: 3px;
+}
+
+.saut-contenu {
+  position: absolute;
+  left: -9999px;
+}
+
+.saut-contenu:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  background: var(--color-ember);
+  color: #fff;
+}
+
+/* Filet de sécurité global : même si un composant oublie son repli,
+   plus rien ne bouge quand l'utilisateur a demandé moins de mouvement.
+   Les composants coupent leurs animations à la source (hook dédié) ;
+   cette règle n'est là que pour rattraper un oubli. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

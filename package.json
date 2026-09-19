@@ -1,26 +1,40 @@
 {
-  "name": "an-tmp",
+  "name": "arsenal-noir",
   "version": "0.1.0",
   "private": true,
+  "description": "Approvisionnement strategique - dossiers de fournisseurs verifies.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint --max-warnings=0",
+    "typecheck": "next typegen && tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "next": "16.3.5",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.13.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.1"
   }
 }
