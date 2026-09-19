@@ -45,6 +45,14 @@ export const CYCLES = {
  */
 export const FPS = {
   fond: 30,
+  /**
+   * La brume dérive sur 48 secondes. Recalculer son champ de bruit 30 fois par
+   * seconde produit une image indiscernable de 15 fois par seconde — on
+   * jetterait la moitié du calcul. Seul le *recalcul* est bridé : l'image
+   * obtenue est bien redessinée à chaque tour, car le canvas est effacé entre
+   * deux, et ce redessin-là est un simple transfert de texture.
+   */
+  brume: 15,
   grain: 12,
 } as const
 

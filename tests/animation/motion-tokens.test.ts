@@ -54,6 +54,12 @@ describe('budget de performance', () => {
     expect(FPS.fond).toBe(30)
   })
 
+  it('recalcule la brume moins souvent qu’il ne dessine', () => {
+    // La brume dérive sur 48 s : la recalculer à chaque image jetterait la
+    // moitié du travail. Seul le recalcul est bridé, pas le redessin.
+    expect(FPS.brume).toBeLessThan(FPS.fond)
+  })
+
   it('garde le grain à 12 fps', () => {
     // Le grain doit sauter comme une pellicule. À 60 fps il devient un voile
     // gris uniforme et perd tout son intérêt.

@@ -63,62 +63,74 @@
 
 ## Étape 2 — Atmosphère
 
-- [ ] **T2.1 — Hook `prefers-reduced-motion`**
+- [x] **T2.1 — Hook `prefers-reduced-motion`**
   - Acceptation : hook unique renvoyant un booléen, réactif au changement de préférence système sans rechargement. Source de vérité unique pour tout le site.
   - Vérifier : test Vitest ; bascule de la préférence dans les DevTools → l'état change en direct.
   - Fichiers : `src/lib/animation/use-reduced-motion.ts`, `tests/animation/use-reduced-motion.test.ts`.
 
-- [ ] **T2.2 — Ordonnanceur d'animation**
+- [x] **T2.2 — Ordonnanceur d'animation**
   - Acceptation : un seul `requestAnimationFrame` partagé, throttlé à 30 fps, coupé sur `visibilitychange` et sur reduced-motion. Les abonnés s'inscrivent et se désinscrivent proprement.
   - Vérifier : test Vitest sur l'inscription/désinscription ; profileur — zéro image rendue en onglet caché.
   - Fichiers : `src/lib/animation/boucle.ts`, `tests/animation/boucle.test.ts`.
 
-- [ ] **T2.3 — Générateur de bruit de Perlin**
+- [x] **T2.3 — Générateur de bruit de Perlin**
   - Acceptation : fonction déterministe à graine, testée, sans dépendance externe.
   - Vérifier : test Vitest — même graine, même sortie ; valeurs bornées entre -1 et 1.
   - Fichiers : `src/lib/animation/bruit.ts`, `tests/animation/bruit.test.ts`.
 
-- [ ] **T2.4 — Canvas de fond : brume**
+- [x] **T2.4 — Canvas de fond : brume**
   - Acceptation : deux ou trois nappes de Perlin dérivant en sens opposés sur un cycle de 40 à 60 s, canvas fixe plein écran derrière tout le contenu.
   - Vérifier : visuel, plus profileur — coût par image mesuré et noté.
   - Fichiers : `src/components/atmosphere/FondAnime.tsx`, `src/lib/animation/couches/brume.ts`.
 
-- [ ] **T2.5 — Canvas de fond : projecteur rasant**
+- [x] **T2.5 — Canvas de fond : projecteur rasant**
   - Acceptation : une ellipse ambrée très diffuse balaie l'écran en ~25 s, en boucle. Le geste signature du site.
   - Vérifier : visuel ; coût par image toujours sous le budget.
   - Fichiers : `src/lib/animation/couches/projecteur.ts`.
 
-- [ ] **T2.6 — Canvas de fond : poussière**
+- [x] **T2.6 — Canvas de fond : poussière**
   - Acceptation : 40 à 80 particules dérivant vers le haut, densité divisée par trois sous 768 px, réaction très légère à la souris (quelques pixels, jamais de poursuite).
   - Vérifier : compter les particules à 375 px et à 1440 px ; visuel.
   - Fichiers : `src/lib/animation/couches/poussiere.ts`.
 
-- [ ] **T2.7 — Canvas de fond : grain de film**
+- [x] **T2.7 — Canvas de fond : grain de film**
   - Acceptation : bruit régénéré à 12 fps exactement (le grain doit sauter), opacité 3 %, `mix-blend-mode: overlay`.
   - Vérifier : visuel ; confirmer la cadence de 12 fps au profileur.
   - Fichiers : `src/lib/animation/couches/grain.ts`.
 
-- [ ] **T2.8 — Grille technique et ligne de balayage**
+- [x] **T2.8 — Grille technique et ligne de balayage**
   - Acceptation : grille SVG de 80 px dérivant en boucle lente, ligne horizontale descendant l'écran toutes les 8 s. En CSS pur, hors canvas.
   - Vérifier : visuel ; aucune image supplémentaire consommée sur le canvas.
   - Fichiers : `src/components/atmosphere/GrilleTechnique.tsx`.
 
-- [ ] **T2.9 — Défilement lissé Lenis**
+- [x] **T2.9 — Défilement lissé Lenis**
   - Acceptation : inertie à lerp 0,08, synchronisé avec GSAP ScrollTrigger, désactivé en reduced-motion.
   - Vérifier : le défilement est fluide ; en reduced-motion le défilement natif reprend la main.
   - Fichiers : `src/lib/animation/lenis.ts`, `src/app/(vitrine)/layout.tsx`.
 
-- [ ] **T2.10 — Curseur réticule**
+- [x] **T2.10 — Curseur réticule**
   - Acceptation : viseur fin sur desktop avec pointeur fin uniquement (`@media (pointer: fine)`), s'élargit sur les éléments cliquables, affiche une étiquette contextuelle. Curseur natif conservé sur tout champ de saisie.
   - Vérifier : desktop visuel ; sur mobile aucun curseur custom ; tabulation au clavier non affectée.
   - Fichiers : `src/components/atmosphere/CurseurReticule.tsx`.
 
-- [ ] **T2.11 — Extinction totale en reduced-motion**
+- [x] **T2.11 — Extinction totale en reduced-motion**
   - Acceptation : canvas démonté, grille figée, Lenis désactivé, curseur natif. Le site reste esthétique — ce n'est pas une version dégradée.
   - Vérifier : test Playwright avec `reducedMotion: 'reduce'` — le canvas n'est pas dans le DOM ; capture d'écran comparée à l'œil.
   - Fichiers : `src/components/atmosphere/FondAnime.tsx`, `e2e/motion.spec.ts`.
 
-**🚪 Porte 2** — 30 fps stables sur mobile au profileur, extinction complète en reduced-motion, zéro image rendue en onglet caché.
+**🚪 Porte 2 — FRANCHIE** (19 septembre 2026)
+
+| Profil                          | fps moyen | p95     | Tâches longues | Verdict |
+| ------------------------------- | --------- | ------- | -------------- | ------- |
+| Bureau 1280×720                 | 60,2      | 17,0 ms | 0 ms           | OK      |
+| Mobile milieu de gamme (CPU ×4) | 60,4      | 16,8 ms | 0 ms           | OK      |
+| Mobile bas de gamme (CPU ×6)    | 54,3      | 33,3 ms | 0 ms           | OK      |
+
+Mesure : `npm run perf`. Extinction complète en reduced-motion et absence de rendu en onglet caché vérifiées par `e2e/motion.spec.ts` (14 tests, bureau et mobile).
+
+⚠️ **Piège de mesure, à ne pas réapprendre.** En Chromium headless il n'y a pas de GPU : la même page tombe à 16 fps et le diagnostic accuse à tort le code. Une page vide donnait 60 fps dans le même environnement, ce qui a permis de disqualifier la mesure. `scripts/mesure-perf.mjs` lance donc volontairement un navigateur **visible**.
+
+⚠️ **Non vérifié : le rendu visuel.** La performance est prouvée, l'esthétique ne l'est pas — l'extension Chrome n'étant pas connectée, aucune capture d'écran n'a pu être prise. À regarder avec `npm run dev`.
 
 ---
 

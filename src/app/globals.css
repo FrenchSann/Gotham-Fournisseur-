@@ -111,6 +111,33 @@ a {
 }
 
 /* ==========================================================================
+   Animations d'ambiance
+   Uniquement transform et opacity : ce sont les deux seules propriétés que le
+   navigateur peut animer sans recalculer la mise en page à chaque image.
+   ========================================================================== */
+
+/* Dérive exactement d'un pas de grille : à la fin du cycle, l'image est
+   identique au départ, donc la boucle est invisible. */
+@keyframes derive-grille {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(var(--pas-grille), var(--pas-grille), 0);
+  }
+}
+
+/* La ligne descend hors écran puis réapparaît en haut. */
+@keyframes balayage {
+  from {
+    transform: translate3d(0, -10vh, 0);
+  }
+  to {
+    transform: translate3d(0, 110vh, 0);
+  }
+}
+
+/* ==========================================================================
    Accessibilité
    ========================================================================== */
 
