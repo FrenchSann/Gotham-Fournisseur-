@@ -182,6 +182,31 @@ Mesure : `npm run perf`. Extinction complète en reduced-motion et absence de re
 - [x] **T3b.7 — Chargement différé** — import dynamique + `requestIdleCallback`.
 - [x] **T3b.8 — Optimisation** — de 10 à 60 images par seconde, mesurée à chaque étape.
 
+**Ajout hors plan initial — étape 3 ter : la passe cinématographique** (demandée le 19 septembre 2026)
+
+- [x] **T3t.1 — Décor** — masses sombres en couloir fuyant, un seul `InstancedMesh`, dessinées derrière la fumée. C'est ce qui donne une échelle au volume. `src/lib/trois/decor.ts`
+- [x] **T3t.2 — Gobo et contre-jour froid** — la lumière arrive découpée en rais larges, et une seconde source froide s'y oppose. Le couple chaud/froid remplace l'ambre général. `src/lib/trois/shaders/volume.ts`
+- [x] **T3t.3 — Diffusion atmosphérique** — la lumière est accumulée à chaque pas du rayon, y compris dans l'air vide. **C'est la correction qui fait exister le faisceau** : tant qu'on n'éclairait que les nappes, il n'y avait rien à éclairer aux trois quarts du volume.
+- [x] **T3t.4 — Étalonnage** — halo, traînée anamorphique, frange chromatique, séparation des tons, courbe filmique, vignettage, en une passe. `src/lib/trois/shaders/composition.ts`
+- [x] **T3t.5 — Mouvement de caméra** — dérive, flottement à l'épaule, travelling au défilement, focale qui respire. Écrit en nombres purs, donc testé. `src/lib/trois/camera-cine.ts`, `tests/trois/camera-cine.test.ts`
+- [x] **T3t.6 — Braises** — une particule sur quarante, plus rapide, scintillante. Même attribut, même appel de dessin.
+- [x] **T3t.7 — Le grain passe dans le shader** — le calque 2D en `mix-blend-mode` est retiré quand la 3D tourne. C'est ce retrait qui a payé tout le reste.
+
+**🚪 Porte 3 ter — FRANCHIE** (19 septembre 2026)
+
+| Profil                              | fps moyen | p95     | Tâches longues | Avant (porte 3) |
+| ----------------------------------- | --------- | ------- | -------------- | --------------- |
+| Bureau 1280×720 (avec 3D)           | 59,1      | 17,0 ms | 0 ms           | 39,8 / 33,6 ms  |
+| Mobile milieu de gamme ×4 (fond 2D) | 60,1      | 16,9 ms | 0 ms           | 60,2 / 16,9 ms  |
+| Mobile bas de gamme ×6 (fond 2D)    | 60,3      | 16,8 ms | 0 ms           | 57,5 / 33,2 ms  |
+
+**Le bureau ne tenait pas 60 images par seconde à la porte 3 ; il les tient maintenant, avec une scène bien plus lourde.** Le point ouvert n°1 de la porte 3 est donc clos, et la piste notée à l'époque était la bonne : le coût n'était pas dans le calcul mais dans la composition de trois calques plein écran dont un en `mix-blend-mode`. Fondre le grain dans le shader a libéré assez de marge pour payer le décor, l'étalonnage, les rais — et pour monter la résolution du volume de 0,30 à 0,42 et les pas de 16 à 20.
+
+⚠️ **Deux points ouverts, honnêtement.**
+
+1. **Le blocage au démarrage monte à 1,1 s sur bureau** (indicatif, cible 500 ms). Un shader de plus à compiler. Il reste hors du chemin critique — différé à un temps mort, contenu lisible et cliquable avant — mais le chiffre est à surveiller.
+2. **`e2e/motion.spec.ts` « cesse de dessiner quand l'onglet est caché » échoue sur cette machine**, en mobile. Vérifié par `git stash` : **il échoue aussi sans les changements de cette étape**, donc ce n'est pas une régression. Le test compte les images d'une page mise en arrière-plan et mesure en réalité la politique de gel du navigateur, qui dépend de l'état du système et des autres fenêtres ouvertes. À reprendre : il devrait observer la boucle du site plutôt que celle du navigateur.
+
 **🚪 Porte 3 — FRANCHIE** (19 septembre 2026)
 
 | Profil                              | Régime établi | fps  | p95     | Tâches longues |
@@ -194,7 +219,7 @@ Contenu lisible sans JavaScript, rendu vérifié de 375 px à 2560 px, 56 tests 
 
 ⚠️ **Deux points ouverts, honnêtement.**
 
-1. **Le bureau oscille entre 30 et 60 images par seconde** plutôt que de tenir 60. Le critère du spec (« 30 fps stables ») est respecté et il n'y a aucune tâche longue, mais le coût est de composition GPU — trois canvas plein écran dont un en `mix-blend-mode`. Piste si besoin : fusionner le grain dans le shader du fond.
+1. ~~**Le bureau oscille entre 30 et 60 images par seconde** plutôt que de tenir 60.~~ **Clos à l'étape 3 ter** : la piste notée ici — fusionner le grain dans le shader du fond — était la bonne. Le bureau tient 59,1 fps avec une scène plus lourde.
 2. **Lighthouse n'a pas encore été passé** (prévu en T8.8). Le chiffre de la porte 3 initiale (≥ 85 mobile) reste donc à confirmer.
 
 ---

@@ -27,7 +27,14 @@ import type { SceneFond } from '@/lib/trois/scene-fond'
  * pas entrer dans le bundle initial ni retarder l'affichage du contenu.
  */
 
-export function Fond3D({ surEchec }: { surEchec: () => void }) {
+export function Fond3D({
+  surEchec,
+  surActivation,
+}: {
+  surEchec: () => void
+  /** Signale que la scène rend réellement des images. */
+  surActivation: () => void
+}) {
   const refCanvas = useRef<HTMLCanvasElement>(null)
   const [capacites] = useState<Capacites | null>(() =>
     typeof window === 'undefined' ? null : detecterCapacites()
@@ -55,8 +62,19 @@ export function Fond3D({ surEchec }: { surEchec: () => void }) {
       )
     }
 
+    // Hauteur défilable, relue au redimensionnement uniquement. La lire à
+    // chaque événement de défilement forcerait un recalcul de mise en page
+    // soixante fois par seconde — exactement ce que le spec interdit.
+    let course = 1
+
     function redimensionner() {
       scene?.redimensionner(window.innerWidth, window.innerHeight)
+      course = Math.max(1, document.documentElement.scrollHeight - window.innerHeight)
+      auDefilement()
+    }
+
+    function auDefilement() {
+      scene?.viserDefilement(window.scrollY / course)
     }
 
     function auContextePerdu(e: Event) {
@@ -94,8 +112,17 @@ export function Fond3D({ surEchec }: { surEchec: () => void }) {
           const boucle = creerBoucle(60)
           desabonner = boucle.abonner((_delta, temps) => scene?.rendre(temps))
 
+          // Le grain passe dans le shader d'étalonnage et le calque 2D qui
+          // s'en chargeait est retiré : un composite plein écran en moins à
+          // chaque image. L'ordre compte — la scène reprend le grain avant
+          // que le parent ne démonte le calque, pour qu'aucune image ne
+          // paraisse sans lui.
+          scene.absorberGrain()
+          surActivation()
+
           window.addEventListener('resize', redimensionner, { passive: true })
           window.addEventListener('pointermove', auPointeur, { passive: true })
+          window.addEventListener('scroll', auDefilement, { passive: true })
         })
         .catch(() => {
           if (!annule) surEchec()
@@ -108,10 +135,12 @@ export function Fond3D({ surEchec }: { surEchec: () => void }) {
       canvas.removeEventListener('webglcontextlost', auContextePerdu)
       window.removeEventListener('resize', redimensionner)
       window.removeEventListener('pointermove', auPointeur)
+      window.removeEventListener('scroll', auDefilement)
       desabonner?.()
       scene?.detruire()
     }
-    // `surEchec` est stable côté parent ; le relister relancerait la scène.
+    // `surEchec` et `surActivation` sont stables côté parent ; les relister
+    // relancerait la scène.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capacites])
 

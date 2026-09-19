@@ -18,6 +18,8 @@ export interface Capacites {
   pasRaymarch: number
   /** Nombre de points du champ de poussière. */
   pointsPoussiere: number
+  /** Nombre de masses sombres du décor. Un seul appel de dessin les porte toutes. */
+  blocsDecor: number
   /** Densité de pixels maximale du rendu 3D. */
   dprMax: number
 }
@@ -39,9 +41,13 @@ export interface Capacites {
  * en dessous du seuil vaut mieux que viser juste au-dessus.
  */
 const COMPLET: Omit<Capacites, 'niveau'> = {
-  echelleVolume: 0.3,
-  pasRaymarch: 16,
+  echelleVolume: 0.42,
+  pasRaymarch: 20,
   pointsPoussiere: 1800,
+  // Trente-six blocs en un seul `InstancedMesh` : le nombre ne se paie pas en
+  // appels de dessin, seulement en sommets — et 36 boîtes font 864 sommets,
+  // soit moins qu'une icône vectorielle un peu détaillée.
+  blocsDecor: 36,
   dprMax: 1.5,
 }
 
@@ -49,6 +55,7 @@ const AUCUN: Omit<Capacites, 'niveau'> = {
   echelleVolume: 0,
   pasRaymarch: 0,
   pointsPoussiere: 0,
+  blocsDecor: 0,
   dprMax: 1,
 }
 

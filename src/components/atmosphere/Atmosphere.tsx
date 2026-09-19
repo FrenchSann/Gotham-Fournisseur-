@@ -29,19 +29,33 @@ const Fond3D = dynamic(() => import('./Fond3D').then((m) => m.Fond3D), { ssr: fa
 export function Atmosphere() {
   const mouvementReduit = useMouvementReduit()
   const [replier, setReplier] = useState(false)
+  const [grainDansLeShader, setGrainDansLeShader] = useState(false)
 
-  // Référence stable : sans `useCallback`, chaque rendu du parent
+  // Références stables : sans `useCallback`, chaque rendu du parent
   // redémarrerait la scène 3D.
-  const surEchec = useCallback(() => setReplier(true), [])
+  const surEchec = useCallback(() => {
+    setReplier(true)
+    // Le repli 2D ne sait pas produire de grain dans son shader : le calque
+    // doit revenir, sinon une perte de contexte WebGL emporterait le grain
+    // avec elle sans que rien ne le signale.
+    setGrainDansLeShader(false)
+  }, [])
+  const surActivation = useCallback(() => setGrainDansLeShader(true), [])
 
   return (
     <>
       <GrilleTechnique />
-      {mouvementReduit ? null : replier ? <FondAnime /> : <Fond3D surEchec={surEchec} />}
-      {/* Le grain reste en 2D dans tous les cas : c'est un calque plein écran
-          en mode overlay, que le GPU compose gratuitement, et il n'aurait rien
-          à gagner à passer en WebGL. */}
-      <FondAnime couches="grain" />
+      {mouvementReduit ? null : replier ? (
+        <FondAnime />
+      ) : (
+        <Fond3D surEchec={surEchec} surActivation={surActivation} />
+      )}
+      {/* Le grain est un calque 2D plein écran en `mix-blend-mode`, et c'est
+          précisément ce qui le rend cher : le navigateur relit tout le cadre à
+          chaque image pour le mélanger. Quand la scène 3D tourne, elle le
+          produit elle-même dans sa passe d'étalonnage et ce calque disparaît.
+          Il ne subsiste que là où il n'y a pas de shader pour le porter. */}
+      {mouvementReduit || grainDansLeShader ? null : <FondAnime couches="grain" />}
     </>
   )
 }
