@@ -131,6 +131,58 @@ Par-dessus, en SVG et non en canvas : une **grille technique** de 80 px qui dér
 
 Contraintes non négociables sur cette couche : 30 fps cible (pas 60 — le grain et la brume n'en ont pas besoin), `requestAnimationFrame` coupé quand l'onglet est caché, densité de particules divisée par trois sous 768 px, et **arrêt complet** si `prefers-reduced-motion: reduce`.
 
+### Couche 0 bis — La scène 3D
+
+C'est la pièce maîtresse visuelle du site. Une scène three.js en WebGL, montée derrière tout le contenu, composée de trois éléments qui se répondent.
+
+**1. Le volume de fumée.** Un plan plein écran portant un shader de _raymarching_ : le fragment shader lance un rayon par pixel dans un volume de bruit fractal et accumule la densité rencontrée. Ce n'est pas une image de fumée, c'est un vrai volume traversé — d'où la profondeur, et d'où le fait que les nappes passent réellement devant et derrière la lumière.
+
+**2. Le faisceau.** Une source lumineuse hors champ, échantillonnée dans le même volume, qui produit des rais de lumière là où la fumée est dense. C'est le projecteur de l'étape 2, devenu volumétrique : au lieu d'un dégradé posé par-dessus, la lumière est occultée par la matière.
+
+**3. Le champ de poussière.** Quelques milliers de points répartis dans un volume en perspective, avec brouillard de profondeur. La caméra dérive lentement et s'incline très légèrement vers le pointeur : c'est cette parallaxe réelle — les points proches se déplaçant plus que les lointains — qui fait basculer la perception de « joli fond » à « espace ».
+
+#### Les objets du catalogue
+
+Chaque pack est représenté par une **caisse de transport métallique** en 3D : arêtes biseautées, renforts d'angle, loquets, référence gravée sur le flanc. Rotation lente au repos, accélérée et inclinée vers le curseur au survol.
+
+Point d'architecture décisif : **un seul contexte WebGL partagé, pas un par carte.** Les navigateurs plafonnent autour de 8 à 16 contextes et en détruisent silencieusement au-delà — six cartes suffiraient à faire disparaître des objets au hasard. On utilise donc un unique canvas plein écran en position fixe, et chaque carte y réserve une zone via le test de ciseau (`scissor`), en suivant la position de son emplacement dans la page.
+
+#### Le coût, et comment il est tenu
+
+Le raymarching est la technique la plus coûteuse de ce document, et la première version tournait à **10 images par seconde**. Les valeurs ci-dessous viennent toutes de la mesure, pas de l'estimation.
+
+| Levier                             | Valeur      | Ce que ça a donné                                                                                                                                                     |
+| ---------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Résolution du rendu volumétrique   | 0,30        | Le volume est rendu petit puis étiré ; un flou n'a pas besoin de finesse.                                                                                             |
+| Pas de marche du rayon             | 16          | Chaque pas coûte une évaluation de bruit complète.                                                                                                                    |
+| Cadence de la passe volumétrique   | 30 Hz       | La fumée dérive sur des dizaines de secondes ; la recalculer 60 fois par seconde jetait la moitié du travail. La composition et la poussière restent, elles, à 60 Hz. |
+| Densité du champ de poussière      | 1800 points | Animés dans le _vertex shader_, pas sur le processeur : zéro boucle et zéro transfert par image.                                                                      |
+| Densité pour la marche d'éclairage | 1 octave    | Contre 3 pour le rayon principal. Une ombre portée n'a besoin que de la masse de matière, pas de son détail.                                                          |
+
+**La correction décisive** portait sur ce dernier point. Avec trois octaves et trois échantillons d'éclairage, chaque pas coûtait quatre densités complètes, soit 192 appels de hachage — plus d'un milliard par image. Séparer la densité fine (rayon principal) de la densité grossière (éclairage) a divisé ce coût par cinq sans différence visible.
+
+#### Le démarrage, un coût distinct
+
+Un site fluide peut quand même geler une seconde au chargement, et les deux défauts ne se soignent pas pareil. Mesuré séparément :
+
+- **`PMREMGenerator` bloquait 2 secondes** de thread principal. C'est la façon normale de donner des reflets au métal, recommandée par three.js. Testé avec `RoomEnvironment` puis avec une image minuscule écrite à la main : même coût, car il vient de la chaîne de flou du générateur et non de sa source. **Supprimé** au profit de trois sources lumineuses orientées. Le métal obtenu est brossé plutôt que poli — plus juste pour une caisse militaire.
+- **Le reste du démarrage est différé à un temps mort** (`requestIdleCallback`). Le coût ne disparaît pas ; il cesse simplement de retarder le moment où la page devient lisible et cliquable.
+
+#### Les conditions de montage
+
+La scène 3D ne démarre **que** si toutes ces conditions sont réunies :
+
+- WebGL2 est disponible et le contexte est réellement obtenu (pas seulement annoncé) ;
+- l'utilisateur n'a pas demandé moins de mouvement ;
+- l'appareil n'est pas jugé modeste — au moins 5 cœurs, plus de 4 Go, écran d'au moins 1024 px ;
+- le navigateur a un temps mort à donner.
+
+**Il n'existe pas de version allégée de la 3D**, et c'est une décision prise sur mesure. Une variante à résolution et pas réduits avait été écrite : elle tenait le régime établi, mais le démarrage restait bloqué cinq à neuf secondes sur processeur lent. Une page figée neuf secondes est pire qu'une page sans 3D.
+
+Si une condition manque, **le fond 2D de l'étape 2 prend le relais**. Ce n'est pas une page dégradée : c'est le site tel qu'il était à la porte 2, mesuré à 60 images par seconde sans aucune tâche longue. La perte du contexte WebGL (`webglcontextlost`, fréquente sur mobile quand le système récupère de la mémoire) bascule sur ce même repli au lieu de laisser un rectangle noir.
+
+---
+
 ### Couche 1 — Choréographie au défilement
 
 - **Hero** : le titre arrive en capitales géantes, lettre par lettre, avec un effet de **décodage** — chaque caractère défile en glyphes aléatoires (`▚ ▞ █ / 7 F X`) pendant 300 ms avant de se fixer. On ouvre un dossier classé, pas une page web.
@@ -179,7 +231,9 @@ Ils comptent autant que les effets, sinon le site devient invendable :
 | Email             | **Resend** + React Email                                   | 3 000 mails/mois gratuits, SPF/DKIM/DMARC guidés, excellente délivrabilité.                                                             |
 | Animation         | **GSAP 3 + ScrollTrigger**                                 | Le seul outil qui gère proprement les sections épinglées et le défilement horizontal. Gratuit depuis 2025, plugins inclus. ~50 Ko gzip. |
 | Défilement        | **Lenis**                                                  | Inertie de défilement, 3 Ko. Sans lui toute la choréographie paraît saccadée.                                                           |
-| Fond animé        | **Canvas 2D maison** (~5 Ko)                               | Brume, projecteur, poussière, grain. Pas de three.js : WebGL coûterait 150 Ko et de la batterie pour un rendu qu'on obtient en 2D.      |
+| Rendu 3D          | **three.js 0.186** (chargé à la demande)                   | Fond volumétrique et objets du catalogue. Importé dynamiquement après le premier rendu : il ne pèse pas sur le chargement initial.      |
+| Fond de repli     | **Canvas 2D maison** (~5 Ko)                               | Brume, projecteur, poussière. Sert aux appareils sans WebGL et à ceux que la détection juge trop faibles.                               |
+| Grain             | **Canvas 2D** en overlay                                   | Indépendant du 3D : reste actif dans tous les cas.                                                                                      |
 | Validation        | **Zod**                                                    | Toute entrée externe (webhook, params d'URL) validée avant usage.                                                                       |
 | Hébergement       | **Vercel** (plan Hobby)                                    | HTTPS + HSTS automatiques, preview par branche, edge caching, 0 €/mois au démarrage.                                                    |
 | Analytics         | **Vercel Web Analytics** (sans cookie)                     | Aucun cookie tiers → **pas de bandeau cookies nécessaire**.                                                                             |
@@ -189,9 +243,16 @@ Ils comptent autant que les effets, sinon le site devient invendable :
 
 Pas de CMS, pas de Prisma, pas de Redux, pas de tRPC, pas de Docker, pas de monorepo, pas de librairie de composants. Le catalogue tient dans un fichier TypeScript de 100 lignes.
 
-Pas de three.js ni de moteur WebGL : le fond animé est du canvas 2D écrit à la main, et il fait le même effet pour trente fois moins de poids. Pas de Motion/Framer en plus de GSAP — un seul moteur d'animation, sinon on se retrouve avec deux boucles de rendu concurrentes.
+Pas de React Three Fiber par-dessus three.js : la scène est fixe et pilotée hors de React, un pont réactif n'apporterait rien et doublerait le poids. Pas de Motion/Framer en plus de GSAP — un seul moteur d'animation, sinon on se retrouve avec deux boucles de rendu concurrentes.
 
-**Budget JavaScript : 200 Ko gzip au premier chargement, animation comprise.** C'est le chiffre qui arbitre toute demande d'ajout de librairie.
+### Budget JavaScript, revu pour la 3D
+
+|                                                                     | Budget                          |
+| ------------------------------------------------------------------- | ------------------------------- |
+| **Chargement initial** (HTML lisible, contenu, interactions)        | **200 Ko gzip**                 |
+| **Chargé après coup** (three.js et les scènes, en import dynamique) | **200 Ko gzip supplémentaires** |
+
+La distinction est ce qui rend la 3D acceptable. Le premier chiffre est celui qui décide si le site paraît rapide : il est inchangé. Le second ne se déclenche qu'après le premier rendu, uniquement sur un appareil qui a WebGL et qui n'a pas demandé moins de mouvement. Un visiteur mobile sur réseau lent voit et utilise un site complet sans avoir téléchargé un octet de three.js.
 
 ### Alerte environnement
 
@@ -647,7 +708,9 @@ Vercel Hobby 0 € + Supabase Free 0 € + Resend Free 0 € + domaine ~12 €/a
 - Animer autre chose que `transform` et `opacity`.
 - Animer quoi que ce soit sur les pages checkout, merci ou téléchargement.
 - Ajouter un second moteur d'animation à côté de GSAP.
-- Dépasser 200 Ko de JavaScript gzip au premier chargement.
+- Dépasser 200 Ko de JavaScript gzip au **chargement initial** (hors 3D différée).
+- Charger three.js de façon synchrone, ou avant le premier rendu du contenu.
+- Monter une scène 3D sans repli pour les appareils sans WebGL.
 - Faire clignoter quoi que ce soit à plus de 3 Hz (risque photosensible, WCAG 2.3.1).
 - Laisser une animation retarder l'affichage du prix, du bouton d'achat ou d'un texte légal.
 
@@ -680,7 +743,9 @@ Vercel Hobby 0 € + Supabase Free 0 € + Resend Free 0 € + domaine ~12 €/a
 - [ ] Le défilement de l'accueil reste au-dessus de 50 fps du haut en bas de la page.
 - [ ] `prefers-reduced-motion: reduce` éteint canvas, parallaxe, Lenis et décodage — et le site reste beau.
 - [ ] JavaScript désactivé : tout le contenu est lisible, rien ne reste invisible.
-- [ ] JS total ≤ 200 Ko gzip au premier chargement.
+- [ ] JS ≤ 200 Ko gzip au chargement initial, 3D exclue.
+- [ ] JS de la 3D ≤ 200 Ko gzip, chargé uniquement après le premier rendu.
+- [ ] Sans WebGL : le site reste complet, avec le fond 2D de repli.
 - [ ] Onglet en arrière-plan : aucune boucle d'animation ne tourne (vérifié au profileur).
 - [ ] Batterie : pas de chauffe notable après 2 minutes sur la page d'accueil en mobile.
 

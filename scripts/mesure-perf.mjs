@@ -32,6 +32,8 @@ import { chromium, devices } from '@playwright/test'
 
 const URL_CIBLE = process.argv[2] ?? 'http://localhost:3100/'
 const DUREE_MS = 4000
+/** Temps laissé à la compilation des shaders avant de mesurer le régime établi. */
+const DEMARRAGE_MS = 4000
 
 async function mesurer(nom, options = {}, bridage = 1) {
   const nav = await chromium.launch({ headless: false })
@@ -43,8 +45,27 @@ async function mesurer(nom, options = {}, bridage = 1) {
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: bridage })
   }
 
+  // --- Phase 1 : démarrage -------------------------------------------------
+  // On observe le blocage du thread principal depuis le tout début, avant même
+  // le chargement : c'est là que se paient la compilation des shaders et la
+  // génération de l'environnement de reflets.
+  await page.addInitScript(() => {
+    window.__blocageDemarrage = 0
+    try {
+      new PerformanceObserver((l) => {
+        for (const e of l.getEntries()) window.__blocageDemarrage += e.duration
+      }).observe({ entryTypes: ['longtask'] })
+    } catch {
+      /* navigateur sans longtask */
+    }
+  })
+
   await page.goto(URL_CIBLE)
-  await page.waitForTimeout(1000) // hydratation et premier rendu
+  // Assez long pour couvrir la compilation des shaders, y compris sur un
+  // processeur bridé : sans cette attente, on mesurerait le démarrage en
+  // croyant mesurer le régime établi.
+  await page.waitForTimeout(DEMARRAGE_MS)
+  const blocageDemarrage = Math.round(await page.evaluate(() => window.__blocageDemarrage ?? 0))
 
   const r = await page.evaluate(
     (duree) =>
@@ -90,18 +111,39 @@ async function mesurer(nom, options = {}, bridage = 1) {
   await nav.close()
 
   const tauxLent = (r.lentes / r.total) * 100
-  const verdict = r.longtasks === 0 && r.p95 <= 34 ? 'OK' : 'A CORRIGER'
 
-  console.log(`\n  ${nom}  [${verdict}]`)
-  console.log(`    fps moyen         : ${r.fps.toFixed(1)}`)
-  console.log(`    intervalle median : ${r.mediane.toFixed(2)} ms`)
-  console.log(`    intervalle p95    : ${r.p95.toFixed(2)} ms   (critere : <= 34 ms)`)
-  console.log(`    taches longues    : ${r.longtasks} ms sur ${DUREE_MS} ms   (critere : 0)`)
+  // Deux chiffres, parce que ce sont deux defauts differents et qu'ils ne se
+  // soignent pas pareil. Une saccade en regime etabli vient du cout par
+  // image ; un gel au demarrage vient d'un travail unique.
+  //
+  // **Seul le regime etabli fait echouer la mesure**, et c'est un choix
+  // explique. Le blocage de demarrage melange deux choses que cette sonde ne
+  // sait pas separer : notre 3D, et l'hydratation de Next. Preuve : les
+  // profils mobiles ci-dessous ne montent aucune scene 3D et affichent
+  // pourtant 1,6 a 3,6 secondes de blocage, entierement imputables a
+  // l'hydratation amplifiee par le bridage processeur. Un seuil dur sur ce
+  // chiffre echouerait sur du code qui n'est pas le notre.
+  //
+  // Il reste affiche, et il doit etre surveille : c'est la seule facon de
+  // voir revenir un cout unique qu'on aurait reintroduit. La contribution
+  // propre de la 3D se lit dans l'ecart entre le profil bureau (qui la monte)
+  // et les profils mobiles (qui ne la montent pas).
+  const regimeOk = r.longtasks === 0 && r.p95 <= 34
+  const demarrageOk = blocageDemarrage <= 500
+
+  console.log(`\n  ${nom}`)
   console.log(
-    `    images > 20 ms    : ${r.lentes}/${r.total} (${tauxLent.toFixed(1)} %)   indicatif`
+    `    demarrage       : ${blocageDemarrage} ms bloques  ` +
+      `[${demarrageOk ? 'OK' : 'A SURVEILLER'}]  (indicatif, cible : <= 500 ms)`
   )
+  console.log(`    regime etabli   : [${regimeOk ? 'OK' : 'A CORRIGER'}]`)
+  console.log(`      fps moyen     : ${r.fps.toFixed(1)}`)
+  console.log(`      intervalle med: ${r.mediane.toFixed(2)} ms`)
+  console.log(`      intervalle p95: ${r.p95.toFixed(2)} ms  (critere : <= 34 ms)`)
+  console.log(`      taches longues: ${r.longtasks} ms sur ${DUREE_MS} ms  (critere : 0)`)
+  console.log(`      images > 20 ms: ${r.lentes}/${r.total} (${tauxLent.toFixed(1)} %)  indicatif`)
 
-  return verdict === 'OK'
+  return regimeOk
 }
 
 console.log(`\nMesure de ${URL_CIBLE} — GPU reel, navigateur visible`)

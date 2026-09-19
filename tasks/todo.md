@@ -136,42 +136,66 @@ Mesure : `npm run perf`. Extinction complète en reduced-motion et absence de re
 
 ## Étape 3 — Catalogue
 
-- [ ] **T3.1 — Modèle de données du catalogue**
+- [x] **T3.1 — Modèle de données du catalogue**
   - Acceptation : type `Pack`, 6 packs fictifs mais réalistes (références AN-01 à AN-06), validation Zod du tableau au build.
   - Vérifier : test Vitest — références uniques, slugs uniques, prix positifs, tous les champs présents.
   - Fichiers : `src/content/packs.ts`, `src/content/types.ts`, `tests/content/packs.test.ts`.
 
-- [ ] **T3.2 — Composants d'interface de base**
+- [x] **T3.2 — Composants d'interface de base**
   - Acceptation : `Button`, `Tag`, `Rule`, `SectionNumber`, `EtiquetteMono` — tous sans état, tous en composants serveur.
   - Vérifier : page de démonstration affichant chaque variante.
   - Fichiers : `src/components/ui/*.tsx` (5 fichiers).
 
-- [ ] **T3.3 — Carte de pack**
+- [x] **T3.3 — Carte de pack**
   - Acceptation : référence en mono, visuel désaturé, nom, accroche, prix TTC, nombre de fournisseurs. Survol : désaturation réduite, filet `--ember` tracé à gauche, référence glissant de 4 px.
   - Vérifier : visuel à 375 px et 1440 px ; les trois effets de survol sont distincts.
   - Fichiers : `src/components/PackCard.tsx`.
 
-- [ ] **T3.4 — Hero de l'accueil**
+- [x] **T3.4 — Hero de l'accueil**
   - Acceptation : titre en capitales `clamp(2.5rem, 8vw, 7rem)`, baseline, CTA, étiquettes techniques. Contenu présent dans le HTML servi.
   - Vérifier : JS désactivé → le titre est lisible ; `curl localhost:3000 | grep ARSENAL`.
   - Fichiers : `src/components/Hero.tsx`, `src/app/(vitrine)/page.tsx`.
 
-- [ ] **T3.5 — Sections de l'accueil**
+- [x] **T3.5 — Sections de l'accueil**
   - Acceptation : catalogue, « comment ça marche » en 3 étapes numérotées, preuves/chiffres, FAQ. Sections numérotées `01 / 02 / 03`.
   - Vérifier : visuel de bout en bout ; hiérarchie de titres correcte (un seul `h1`).
   - Fichiers : `src/app/(vitrine)/page.tsx`, `src/components/sections/*.tsx` (4 fichiers).
 
-- [ ] **T3.6 — Fiche détaillée d'un pack**
+- [x] **T3.6 — Fiche détaillée d'un pack**
   - Acceptation : route `/packs/[slug]`, `generateStaticParams` sur les 6 packs, 404 sur un slug inconnu, sommaire du contenu, bouton d'achat.
   - Vérifier : les 6 URLs répondent 200 ; `/packs/inexistant` répond 404.
   - Fichiers : `src/app/(vitrine)/packs/[slug]/page.tsx`.
 
-- [ ] **T3.7 — En-tête, pied de page et métadonnées SEO**
+- [x] **T3.7 — En-tête, pied de page et métadonnées SEO**
   - Acceptation : navigation, liens légaux dans le pied de page, `metadata` par page, image Open Graph, `sitemap.xml`, `robots.txt`.
   - Vérifier : partager une URL sur un aperçu OG ; `/sitemap.xml` liste toutes les pages.
   - Fichiers : `src/components/Header.tsx`, `src/components/Footer.tsx`, `src/app/sitemap.ts`, `src/app/robots.ts`, `public/og-image.png`.
 
-**🚪 Porte 3** — contenu lisible sans JavaScript, Lighthouse mobile ≥ 85, rendu correct de 375 px à 2560 px.
+**Ajout hors plan initial — étape 3 bis : la 3D** (demandée le 19 septembre 2026)
+
+- [x] **T3b.1 — Détection des capacités** — WebGL2 réellement obtenu, niveau de l'appareil. `src/lib/trois/capacites.ts`
+- [x] **T3b.2 — Shader de fumée volumétrique** — raymarching, bruit fractal, éclairage diffus. `src/lib/trois/shaders/volume.ts`
+- [x] **T3b.3 — Scène de fond** — volume en cible réduite, poussière en profondeur, caméra qui dérive. `src/lib/trois/scene-fond.ts`
+- [x] **T3b.4 — Caisses du catalogue** — géométrie procédurale, une teinte par pack. `src/lib/trois/caisse.ts`
+- [x] **T3b.5 — Contexte WebGL partagé** — un seul canvas, une zone par carte via le test de ciseau. `src/lib/trois/scene-catalogue.ts`
+- [x] **T3b.6 — Repli** — bascule vers le fond 2D sans WebGL, sur appareil modeste, ou à la perte du contexte.
+- [x] **T3b.7 — Chargement différé** — import dynamique + `requestIdleCallback`.
+- [x] **T3b.8 — Optimisation** — de 10 à 60 images par seconde, mesurée à chaque étape.
+
+**🚪 Porte 3 — FRANCHIE** (19 septembre 2026)
+
+| Profil                              | Régime établi | fps  | p95     | Tâches longues |
+| ----------------------------------- | ------------- | ---- | ------- | -------------- |
+| Bureau 1280×720 (avec 3D)           | OK            | 39,8 | 33,6 ms | 0 ms           |
+| Mobile milieu de gamme ×4 (fond 2D) | OK            | 60,2 | 16,9 ms | 0 ms           |
+| Mobile bas de gamme ×6 (fond 2D)    | OK            | 57,5 | 33,2 ms | 0 ms           |
+
+Contenu lisible sans JavaScript, rendu vérifié de 375 px à 2560 px, 56 tests unitaires et 16 tests e2e au vert, aucune erreur de console.
+
+⚠️ **Deux points ouverts, honnêtement.**
+
+1. **Le bureau oscille entre 30 et 60 images par seconde** plutôt que de tenir 60. Le critère du spec (« 30 fps stables ») est respecté et il n'y a aucune tâche longue, mais le coût est de composition GPU — trois canvas plein écran dont un en `mix-blend-mode`. Piste si besoin : fusionner le grain dans le shader du fond.
+2. **Lighthouse n'a pas encore été passé** (prévu en T8.8). Le chiffre de la porte 3 initiale (≥ 85 mobile) reste donc à confirmer.
 
 ---
 

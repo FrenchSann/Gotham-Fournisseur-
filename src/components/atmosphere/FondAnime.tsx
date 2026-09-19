@@ -11,85 +11,67 @@ import { SEUIL_MOBILE } from '@/lib/animation/motion-tokens'
 import { useMouvementReduit } from '@/lib/animation/use-reduced-motion'
 
 /**
- * Le fond permanent du site.
+ * Fond en canvas 2D.
  *
- * Deux canvas, une seule boucle :
+ * Deux rôles, choisis par `couches` :
  *
- *   - **fond** : brume, projecteur et poussière, composés ensemble à 30 fps.
- *   - **grain** : calque séparé en `mix-blend-mode: overlay`, redessiné à
- *     12 fps seulement. Le séparer permet de le rafraîchir moins souvent que
- *     le reste sans rien recalculer — le navigateur compose les deux couches
- *     gratuitement, en GPU.
+ *   - **`ambiance`** — brume, projecteur et poussière. C'est le repli quand la
+ *     scène 3D ne peut pas tourner. Pas une version au rabais : c'est le site
+ *     tel qu'il était à la porte 2, qui tenait déjà 60 fps.
+ *   - **`grain`** — le grain de film seul, en calque `overlay`. Il est monté
+ *     en permanence, par-dessus la 3D comme par-dessus le 2D, parce qu'il
+ *     n'aurait rien à gagner à passer en WebGL et qu'il est ce qui empêche les
+ *     aplats noirs de paraître plats.
  *
- * Le composant ne rend **rien du tout** quand l'utilisateur a demandé moins de
- * mouvement : pas un canvas figé, pas un élément caché. Rien dans le DOM, rien
- * en mémoire, aucune boucle. C'est la version sobre du site, pas une version
- * dégradée.
+ * Le composant ne rend **rien du tout** en mouvement réduit : pas un canvas
+ * figé, pas un élément caché. Rien dans le DOM, aucune boucle.
  */
 
 /** Plafond de densité de pixels. Au-delà, on quadruple le coût de remplissage
  *  pour un flou et un bruit que personne ne verra plus net. */
 const DPR_MAX = 1.5
 
-export function FondAnime() {
-  const refFond = useRef<HTMLCanvasElement>(null)
-  const refGrain = useRef<HTMLCanvasElement>(null)
+export function FondAnime({ couches = 'ambiance' }: { couches?: 'ambiance' | 'grain' }) {
+  const refCanvas = useRef<HTMLCanvasElement>(null)
   const mouvementReduit = useMouvementReduit()
+  const estGrain = couches === 'grain'
 
   useEffect(() => {
     if (mouvementReduit) return
 
-    const canvasFond = refFond.current
-    const canvasGrain = refGrain.current
-    if (!canvasFond || !canvasGrain) return
+    const canvas = refCanvas.current
+    if (!canvas) return
 
-    const ctxFond = canvasFond.getContext('2d', { alpha: true })
-    const ctxGrain = canvasGrain.getContext('2d', { alpha: true })
-    if (!ctxFond || !ctxGrain) return
+    const ctx = canvas.getContext('2d', { alpha: true })
+    if (!ctx) return
 
-    const scene: Scene = {
-      largeur: 0,
-      hauteur: 0,
-      sourisX: 0,
-      sourisY: 0,
-      allege: false,
-    }
+    const scene: Scene = { largeur: 0, hauteur: 0, sourisX: 0, sourisY: 0, allege: false }
 
-    const couchesFond: Couche[] = [creerBrume(), creerProjecteur(), creerPoussiere()]
-    const grain = creerGrain()
+    const listeCouches: Couche[] = estGrain
+      ? [creerGrain()]
+      : [creerBrume(), creerProjecteur(), creerPoussiere()]
 
-    function preparerCanvas(
-      canvas: HTMLCanvasElement,
-      ctx: CanvasRenderingContext2D,
-      densite: number
-    ) {
-      canvas.width = Math.round(scene.largeur * densite)
-      canvas.height = Math.round(scene.hauteur * densite)
-      canvas.style.width = `${scene.largeur}px`
-      canvas.style.height = `${scene.hauteur}px`
-      // On raisonne partout en pixels CSS ; la mise à l'échelle est faite ici,
-      // une fois, plutôt que dans chaque couche.
-      ctx.setTransform(densite, 0, 0, densite, 0, 0)
-    }
+    // Le grain reste en densité 1 : du bruit en haute définition, c'est du
+    // bruit plus fin — donc moins visible — pour quatre fois le coût.
+    const densiteCible = estGrain ? 1 : Math.min(window.devicePixelRatio || 1, DPR_MAX)
 
     function redimensionner() {
       scene.largeur = window.innerWidth
       scene.hauteur = window.innerHeight
       scene.allege = window.innerWidth < SEUIL_MOBILE
 
-      const densite = Math.min(window.devicePixelRatio || 1, DPR_MAX)
-      preparerCanvas(canvasFond!, ctxFond!, densite)
-      // Le grain reste en densité 1 : du bruit en haute définition, c'est du
-      // bruit plus fin — donc moins visible — pour quatre fois le coût.
-      preparerCanvas(canvasGrain!, ctxGrain!, 1)
+      canvas!.width = Math.round(scene.largeur * densiteCible)
+      canvas!.height = Math.round(scene.hauteur * densiteCible)
+      canvas!.style.width = `${scene.largeur}px`
+      canvas!.style.height = `${scene.hauteur}px`
+      // On raisonne partout en pixels CSS ; la mise à l'échelle est faite ici,
+      // une fois, plutôt que dans chaque couche.
+      ctx!.setTransform(densiteCible, 0, 0, densiteCible, 0, 0)
 
-      for (const couche of couchesFond) couche.redimensionner(scene)
-      grain.redimensionner(scene)
+      for (const couche of listeCouches) couche.redimensionner(scene)
     }
 
     function auMouvementSouris(e: PointerEvent) {
-      // Normalisé dans [-1, 1] : les couches n'ont pas à connaître la taille
-      // de l'écran pour réagir.
       scene.sourisX = (e.clientX / scene.largeur) * 2 - 1
       scene.sourisY = (e.clientY / scene.hauteur) * 2 - 1
     }
@@ -98,14 +80,14 @@ export function FondAnime() {
 
     const boucle = creerBoucle()
     const desabonner = boucle.abonner((_delta, temps) => {
-      ctxFond.clearRect(0, 0, scene.largeur, scene.hauteur)
-      for (const couche of couchesFond) couche.dessiner(ctxFond, temps, scene)
-      // Le grain s'auto-limite à 12 fps et sort immédiatement le reste du temps.
-      grain.dessiner(ctxGrain, temps, scene)
+      // Le grain gère son propre effacement : il ne redessine qu'à 12 fps et
+      // doit conserver son image entre deux.
+      if (!estGrain) ctx.clearRect(0, 0, scene.largeur, scene.hauteur)
+      for (const couche of listeCouches) couche.dessiner(ctx, temps, scene)
     })
 
     window.addEventListener('resize', redimensionner, { passive: true })
-    window.addEventListener('pointermove', auMouvementSouris, { passive: true })
+    if (!estGrain) window.addEventListener('pointermove', auMouvementSouris, { passive: true })
 
     return () => {
       window.removeEventListener('resize', redimensionner)
@@ -113,18 +95,16 @@ export function FondAnime() {
       desabonner()
       boucle.detruire()
     }
-  }, [mouvementReduit])
+  }, [mouvementReduit, estGrain])
 
   if (mouvementReduit) return null
 
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      <canvas ref={refFond} className="absolute inset-0 block" />
-      <canvas
-        ref={refGrain}
-        className="absolute inset-0 block"
-        style={{ mixBlendMode: 'overlay' }}
-      />
-    </div>
+    <canvas
+      ref={refCanvas}
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 -z-10 block"
+      style={estGrain ? { mixBlendMode: 'overlay', zIndex: -9 } : undefined}
+    />
   )
 }
