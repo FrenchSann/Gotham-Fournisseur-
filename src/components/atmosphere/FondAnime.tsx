@@ -27,9 +27,20 @@ import { useMouvementReduit } from '@/lib/animation/use-reduced-motion'
  * figé, pas un élément caché. Rien dans le DOM, aucune boucle.
  */
 
-/** Plafond de densité de pixels. Au-delà, on quadruple le coût de remplissage
- *  pour un flou et un bruit que personne ne verra plus net. */
+/**
+ * Plafond de densité de pixels. Au-delà, on quadruple le coût de remplissage
+ * pour un flou et un bruit que personne ne verra plus net.
+ *
+ * **Densité 1 sous 768 px, et c'est une décision de l'étape 4.** Tant que la
+ * page était immobile, la densité 1,5 ne coûtait rien de visible. Au défilement,
+ * elle coûte huit images par seconde sur un téléphone milieu de gamme — mesure
+ * à l'appui, fond désactivé puis réactivé. Or ce que ce canvas dessine est une
+ * nappe floue, un halo et des points de deux pixels : la finesse
+ * supplémentaire n'a jamais rien apporté, et c'est exactement le raisonnement
+ * qui tenait déjà pour le grain.
+ */
 const DPR_MAX = 1.5
+const DPR_MAX_MOBILE = 1
 
 export function FondAnime({ couches = 'ambiance' }: { couches?: 'ambiance' | 'grain' }) {
   const refCanvas = useRef<HTMLCanvasElement>(null)
@@ -53,7 +64,8 @@ export function FondAnime({ couches = 'ambiance' }: { couches?: 'ambiance' | 'gr
 
     // Le grain reste en densité 1 : du bruit en haute définition, c'est du
     // bruit plus fin — donc moins visible — pour quatre fois le coût.
-    const densiteCible = estGrain ? 1 : Math.min(window.devicePixelRatio || 1, DPR_MAX)
+    const plafond = window.innerWidth < SEUIL_MOBILE ? DPR_MAX_MOBILE : DPR_MAX
+    const densiteCible = estGrain ? 1 : Math.min(window.devicePixelRatio || 1, plafond)
 
     function redimensionner() {
       scene.largeur = window.innerWidth

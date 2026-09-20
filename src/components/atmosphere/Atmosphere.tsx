@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useCallback, useState } from 'react'
+import { ECRAN_LARGE, useSourceMedia } from '@/lib/animation/media'
 import { useMouvementReduit } from '@/lib/animation/use-reduced-motion'
 import { FondAnime } from './FondAnime'
 import { GrilleTechnique } from './GrilleTechnique'
@@ -28,6 +29,7 @@ const Fond3D = dynamic(() => import('./Fond3D').then((m) => m.Fond3D), { ssr: fa
 
 export function Atmosphere() {
   const mouvementReduit = useMouvementReduit()
+  const ecranLarge = useSourceMedia(ECRAN_LARGE)
   const [replier, setReplier] = useState(false)
   const [grainDansLeShader, setGrainDansLeShader] = useState(false)
 
@@ -52,10 +54,22 @@ export function Atmosphere() {
       )}
       {/* Le grain est un calque 2D plein écran en `mix-blend-mode`, et c'est
           précisément ce qui le rend cher : le navigateur relit tout le cadre à
-          chaque image pour le mélanger. Quand la scène 3D tourne, elle le
-          produit elle-même dans sa passe d'étalonnage et ce calque disparaît.
-          Il ne subsiste que là où il n'y a pas de shader pour le porter. */}
-      {mouvementReduit || grainDansLeShader ? null : <FondAnime couches="grain" />}
+          chaque image pour le mélanger, et il le refait à chaque image où la
+          page défile. Deux façons de ne pas le payer :
+
+          — quand la scène 3D tourne, elle le produit dans sa passe
+            d'étalonnage et le calque n'existe pas ;
+          — sous 768 px, il n'est tout simplement pas monté. C'est le seul
+            retrait du « mobile allégé » du spec qui n'était pas prévu, et il
+            est mesuré : le calque coûtait une dizaine d'images par seconde au
+            défilement sur un téléphone milieu de gamme, pour une texture de
+            trois pour cent d'opacité qu'on ne distingue pas à bout de bras.
+
+          Le fondre dans le canvas d'ambiance a été essayé, et c'est pire :
+          `globalCompositeOperation` en canvas 2D est un mélange fait par le
+          processeur à chaque image, quand `mix-blend-mode` est fait par le
+          compositeur. La mesure donnait 23 images par seconde au lieu de 56. */}
+      {mouvementReduit || grainDansLeShader || !ecranLarge ? null : <FondAnime couches="grain" />}
     </>
   )
 }

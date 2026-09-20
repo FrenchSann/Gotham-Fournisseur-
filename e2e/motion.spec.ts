@@ -42,20 +42,27 @@ test.describe('mouvement réduit', () => {
 test.describe('mouvement autorisé', () => {
   test.use({ reducedMotion: 'no-preference' })
 
-  test('monte la scène 3D et le grain', async ({ page }) => {
+  test('monte un fond animé', async ({ page }) => {
     await page.goto('/')
-    // Un canvas pour le fond volumétrique, un pour le grain, un pour les
-    // caisses du catalogue. On vérifie un minimum plutôt qu'un nombre exact :
-    // le compte dépend du fond retenu (3D ou repli 2D), et figer ce chiffre
-    // ferait échouer le test sur une machine sans WebGL sans qu'aucune
-    // régression n'ait eu lieu.
+    // **Un minimum, pas un nombre exact.** Le compte de canvas dépend de trois
+    // choses qui varient d'une machine à l'autre : le fond retenu (3D ou repli
+    // 2D), la présence des caisses du catalogue (3D seulement), et la largeur
+    // de l'écran — sous 768 px, le calque de grain n'est pas monté, parce qu'un
+    // plein écran en `mix-blend-mode` coûtait une dizaine d'images par seconde
+    // au défilement sur un téléphone. Figer le chiffre ferait échouer ce test
+    // sur une machine sans WebGL sans qu'aucune régression n'ait eu lieu.
+    //
+    // Ce que le test garantit vraiment, et qui est le seul point important :
+    // **mouvement autorisé ⇒ il y a un fond animé**. Son absence se lit dans le
+    // premier test du fichier, qui exige zéro canvas en mouvement réduit.
+    //
     // `expect.poll` et non `expect(await ...count())` : le fond se monte en
     // deux temps. La détection des capacités décide d'abord si la 3D est
     // possible, et le repli 2D n'apparaît qu'au rendu suivant. Un comptage
     // immédiat attrape l'état intermédiaire et échoue au hasard.
     await expect
       .poll(() => page.locator('canvas').count(), { timeout: 10_000 })
-      .toBeGreaterThanOrEqual(2)
+      .toBeGreaterThanOrEqual(1)
   })
 
   test('charge three.js seulement après le contenu', async ({ page }) => {

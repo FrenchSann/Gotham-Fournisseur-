@@ -1,10 +1,12 @@
 /**
- * Attendre un temps mort du navigateur avant de monter la 3D.
+ * Attendre un temps mort du navigateur avant de monter ce qui coûte cher.
  *
- * Même réduit, le démarrage de la scène coûte environ une seconde de travail
- * processeur : analyse de three.js, compilation du shader de raymarching,
- * génération de la carte de reflets. Ce coût est incompressible — mais il est
- * *déplaçable*.
+ * Deux clients : la scène 3D et le moteur de choréographie. Le démarrage de la
+ * scène coûte environ une seconde de travail processeur (analyse de three.js,
+ * compilation du shader de raymarching) ; celui de GSAP coûte son analyse et
+ * l'initialisation de ScrollTrigger, ce qui est bien moins cher sur une machine
+ * de bureau mais devient plusieurs secondes sur un téléphone d'entrée de gamme.
+ * Ces coûts sont incompressibles — mais ils sont *déplaçables*.
  *
  * Le faire pendant le chargement, c'est retarder le moment où la page devient
  * lisible et cliquable. Le faire après, c'est une seconde pendant laquelle le

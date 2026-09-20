@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { creerBoucle } from '@/lib/animation/boucle'
 import { FPS } from '@/lib/animation/motion-tokens'
 import { detecterCapacites, type Capacites } from '@/lib/trois/capacites'
-import { auTempsMort } from '@/lib/trois/differer'
+import { auTempsMort } from '@/lib/animation/differer'
 import type { SceneFond } from '@/lib/trois/scene-fond'
 
 /**

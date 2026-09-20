@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import Lenis from 'lenis'
+import { definirLenis, estPiloteExterieurement } from '@/lib/animation/lenis'
 import { LENIS_LERP } from '@/lib/animation/motion-tokens'
 import { useMouvementReduit } from '@/lib/animation/use-reduced-motion'
 
@@ -14,11 +15,12 @@ import { useMouvementReduit } from '@/lib/animation/use-reduced-motion'
  * produit des animations qui avancent par sauts. Lenis interpole cette
  * position, et c'est ce qui rend le reste fluide.
  *
- * Note d'architecture : Lenis tourne ici sur sa propre boucle, à la cadence de
- * l'écran — contrairement au fond, le défilement a besoin de 60 fps ou plus.
- * À l'étape 4, GSAP arrivera avec son propre ticker et Lenis sera branché
- * dessus (`gsap.ticker.add`), ce qui ramènera le site à deux boucles au lieu
- * de trois.
+ * Note d'architecture : Lenis tourne sur sa propre boucle tant qu'il est seul,
+ * à la cadence de l'écran — contrairement au fond, le défilement a besoin de
+ * 60 fps ou plus. Dès que GSAP se charge, il réclame le pilotage et fait
+ * avancer Lenis depuis son propre ticker ; la boucle ci-dessous continue de
+ * tourner mais cesse d'appeler `raf`. Deux boucles sur la page, jamais deux
+ * positions de défilement différentes dans la même image.
  */
 export function DefilementLisse() {
   const mouvementReduit = useMouvementReduit()
@@ -36,13 +38,19 @@ export function DefilementLisse() {
       syncTouch: false,
     })
 
+    definirLenis(lenis)
+
     let idImage = requestAnimationFrame(function image(temps: number) {
-      lenis.raf(temps)
+      // Le test est refait à chaque image plutôt qu'une fois au montage :
+      // GSAP peut arriver à n'importe quel moment, et il arrive toujours
+      // après — c'est tout l'intérêt de son chargement différé.
+      if (!estPiloteExterieurement()) lenis.raf(temps)
       idImage = requestAnimationFrame(image)
     })
 
     return () => {
       cancelAnimationFrame(idImage)
+      definirLenis(null)
       lenis.destroy()
     }
   }, [mouvementReduit])

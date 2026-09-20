@@ -1,6 +1,7 @@
 'use client'
 
 import { useSyncExternalStore } from 'react'
+import { SEUIL_MOBILE } from './motion-tokens'
 
 /**
  * Lecture réactive d'une requête média, utilisable comme source externe React.
@@ -57,3 +58,13 @@ export function useSourceMedia(source: SourceMedia): boolean {
  * certains appareils hybrides utilisés au doigt.
  */
 export const POINTEUR_PRECIS = creerSourceMedia('(pointer: fine) and (hover: hover)', false)
+
+/**
+ * Écran large, au sens du seuil mobile du spec.
+ *
+ * Par défaut `false` : côté serveur et tant que `matchMedia` n'a pas répondu,
+ * on suppose l'écran étroit. C'est la même prudence qu'ailleurs dans ce
+ * fichier — mieux vaut monter une couche décorative une image trop tard que
+ * l'imposer à un appareil qui ne la porte pas.
+ */
+export const ECRAN_LARGE = creerSourceMedia(`(min-width: ${SEUIL_MOBILE}px)`, false)

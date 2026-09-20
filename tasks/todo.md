@@ -226,53 +226,84 @@ Contenu lisible sans JavaScript, rendu vérifié de 375 px à 2560 px, 56 tests 
 
 ## Étape 4 — Choréographie
 
-- [ ] **T4.1 — Intégrer GSAP et ScrollTrigger**
-  - Acceptation : GSAP installé, ScrollTrigger branché sur Lenis, un contexte GSAP nettoyé au démontage (pas de fuite entre navigations).
-  - Vérifier : naviguer dix fois entre deux pages → le nombre de ScrollTriggers actifs reste stable.
-  - Fichiers : `src/lib/animation/gsap.ts`, `package.json`.
+- [x] **T4.1 — Intégrer GSAP et ScrollTrigger**
+  - Fait : chargement différé à un temps mort (comme three.js), ScrollTrigger branché sur Lenis, un contexte GSAP par composant, révoqué au démontage. Registre `lenis.ts` pour que le moteur atteigne une instance créée par React.
+  - Vérifié : `e2e/choregraphie.spec.ts` — cinq allers-retours accueil ↔ fiche, le compte de déclencheurs ne croît pas.
+  - Fichiers : `src/lib/animation/gsap.ts`, `lenis.ts`, `use-choregraphie.ts`, `differer.ts` (déplacé depuis `lib/trois`).
+  - ⚠️ **Piège coûteux, documenté sur place** : les deux boucles doivent partager une horloge. Le ticker GSAP compte depuis son initialisation, le composant depuis `performance.now()` ; à la reprise du pilotage, Lenis recevait un horodatage inférieur de plusieurs secondes, en déduisait un intervalle négatif, et **la page se mettait à défiler toute seule** — en production uniquement.
 
-- [ ] **T4.2 — Texte à décodage**
-  - Acceptation : chaque caractère défile en glyphes aléatoires pendant ~300 ms avant de se fixer, en cascade. Affiche le texte final immédiatement en reduced-motion.
-  - Vérifier : visuel ; test Playwright — le texte final est dans le DOM dès le départ.
-  - Fichiers : `src/components/motion/TexteDecode.tsx`, `tests/motion/texte-decode.test.ts`.
+- [x] **T4.2 — Texte à décodage**
+  - Fait : logique pure dans `lib/animation/decodage.ts` (`brouiller(texte, avancement)`), composant qui lit le texte servi pour connaître sa cible. Blocs pleins retirés du jeu de glyphes après essai : à 9 rem, un « █ » se lit comme un rectangle blanc, pas comme un caractère.
+  - Vérifié : 10 tests Vitest (longueur constante, cascade monotone, déterminisme) ; e2e — le titre final est servi sans JavaScript et en mouvement réduit.
+  - Fichiers : `src/lib/animation/decodage.ts`, `src/components/motion/TexteDecode.tsx`, `tests/motion/texte-decode.test.ts`.
 
-- [ ] **T4.3 — Révélation par volet**
-  - Acceptation : `clip-path: inset()` animé, toujours dans le même sens. Masque depuis JS au montage, jamais depuis le CSS servi.
-  - Vérifier : JS désactivé → tout le contenu reste visible.
-  - Fichiers : `src/components/motion/RevelationVolet.tsx`.
+- [x] **T4.3 — Révélation par volet**
+  - Fait : `clip-path: inset()` animé, toujours du bas vers le haut, posé par attribut `data-revelation`. **Sous 768 px, remplacé par un fondu-glissé** (`opacity` + `y`) : un `clip-path` animé est repeint à chaque image, et une douzaine de blocs révélés pendant un défilement rapide bloquaient le thread principal d'un téléphone. Le spec prévoit un « mobile allégé » ; ceci en fait partie.
+  - Vérifié : e2e sans JavaScript et en mouvement réduit — aucun bloc ne porte de découpe résiduelle.
+  - Fichiers : `src/components/motion/Choregraphie.tsx`.
 
-- [ ] **T4.4 — Parallaxe sur trois plans**
-  - Acceptation : fond 0,2× / médian 0,6× / premier plan 1×, amplitude réduite de moitié sous 768 px, `transform` uniquement.
-  - Vérifier : profileur — zéro recalcul de mise en page pendant le défilement.
-  - Fichiers : `src/components/motion/Parallaxe.tsx`.
+- [x] **T4.4 — Parallaxe sur trois plans**
+  - Fait : attribut `data-parallaxe="fond|median"`, `transform` uniquement, amplitude divisée par deux sous 768 px, couche de composition promue pendant le mouvement seulement.
+  - Fichiers : `src/components/motion/Choregraphie.tsx`.
 
-- [ ] **T4.5 — Section catalogue épinglée**
-  - Acceptation : la section se fige, les cartes défilent horizontalement, la page reprend ensuite. Remplacée par un défilement vertical classique sous 768 px et en reduced-motion.
-  - Vérifier : desktop et mobile ; pas de saut à l'entrée ni à la sortie du pin.
-  - Fichiers : `src/components/sections/CatalogueEpingle.tsx`.
-  - ⚠️ La tâche la plus délicate du projet. Si elle résiste plus de 3 h, on bascule sur une grille verticale animée et on avance.
+- [x] **T4.5 — Section catalogue épinglée**
+  - Fait : la section se fige sur la hauteur de l'écran, le rayonnage défile à l'horizontale, un pixel de molette pour un pixel de rayonnage, scrub amorti à 0,6 s. Grille verticale sous 768 px et en mouvement réduit.
+  - Vérifié : captures à 1440 px, entrée, milieu et sortie de l'épinglage ; les caisses 3D suivent leur carte pendant le défilement horizontal.
+  - Fichiers : `src/components/sections/CatalogueEpingle.tsx`, `src/app/(vitrine)/page.tsx`.
+  - Trois pièges documentés dans l'en-tête du fichier : distance recalculée (`invalidateOnRefresh`), aucune marge extérieure (le `pin-spacer` la piégerait), largeur explicite des enfants (une colonne flex les rétracte sur leur contenu).
 
-- [ ] **T4.6 — Compteurs et bandeau défilant**
-  - Acceptation : les chiffres s'incrémentent à l'entrée dans le viewport ; marquee mono en défilement infini dont la vitesse suit le sens du scroll.
-  - Vérifier : visuel ; les valeurs finales correspondent aux données de `packs.ts`.
-  - Fichiers : `src/components/motion/Compteur.tsx`, `src/components/motion/BandeauDefilant.tsx`.
+- [x] **T4.6 — Compteurs et bandeau défilant**
+  - Fait : compteurs partant de zéro _depuis le script_ (la vraie valeur est servie), chiffres tabulaires pour que la ligne ne danse pas ; bandeau en deux copies, vitesse pilotée par la vélocité de défilement, **arrêté tant qu'il n'est pas à l'écran** et vitesse visée par `quickTo` plutôt que par une animation allouée à chaque événement.
+  - Vérifié : e2e — les vrais chiffres sont servis sans JavaScript ; mentions construites depuis `packs.ts`.
+  - Fichiers : `src/components/motion/Compteur.tsx`, `BandeauDefilant.tsx`.
 
-- [ ] **T4.7 — Filets qui se tracent**
-  - Acceptation : les bordures fines se dessinent d'un point à l'autre à l'entrée dans le viewport, via `scaleX`/`scaleY`.
-  - Vérifier : visuel ; aucune animation de `width` ou `height`.
-  - Fichiers : `src/components/ui/Rule.tsx`.
+- [x] **T4.7 — Filets qui se tracent**
+  - Fait : `Filet` gagne une option `anime` qui pose un attribut ; le tracé se fait en `scaleX` depuis la gauche. Le filet reste un composant serveur.
+  - Fichiers : `src/components/ui/Primitives.tsx`, `src/components/motion/Choregraphie.tsx`.
 
-- [ ] **T4.8 — Transitions de page**
-  - Acceptation : volet fermant, référence de la page suivante en mono, réouverture. 600 ms au total. API View Transitions avec repli en fondu.
-  - Vérifier : Chrome et Firefox ; désactivé en reduced-motion.
+- [x] **T4.8 — Transitions de page**
+  - Fait : `<ViewTransition>` de React (disponible sans configuration dans l'App Router de Next 16), volet fermant en 250 ms puis ouvrant en 350 ms — 600 ms au total. Racine non animée, clics non capturés pendant la transition, coupé en mouvement réduit.
   - Fichiers : `src/components/atmosphere/VoletTransition.tsx`, `src/app/globals.css`.
+  - ⚠️ **En retrait sur un point du spec** : la référence de la page suivante ne s'affiche pas en mono pendant que le volet est fermé. Pendant une transition il n'existe que deux captures d'écran, aucun élément vivant ; y poser un texte demanderait un calque monté hors de React, c'est-à-dire exactement la machinerie que cette API permet d'éviter. La référence se découvre en haut de la fiche, à la levée du volet.
 
-- [ ] **T4.9 — Passe de performance**
-  - Acceptation : défilement complet de l'accueil au-dessus de 50 fps sur mobile milieu de gamme, JS ≤ 200 Ko gzip. Chaque animation dépassant le budget est simplifiée ou supprimée.
-  - Vérifier : enregistrement profileur du haut en bas de la page ; `npx @next/bundle-analyzer`.
-  - Fichiers : variables selon les mesures.
+- [x] **T4.9 — Passe de performance**
+  - Fait : `npm run perf` mesure désormais **deux régimes** (au repos et en défilement) et **le budget JavaScript**, en séparant l'initial du différé. Corrections issues de la mesure : chargement de GSAP différé à un temps mort, déclencheurs groupés par `ScrollTrigger.batch` (deux `IntersectionObserver` au lieu d'une cinquantaine de déclencheurs testés à chaque image), bandeau arrêté hors champ, densité du canvas ramenée à 1 sous 768 px, calque de grain non monté sous 768 px, révélation composée sur écran étroit.
+  - Fichiers : `scripts/mesure-perf.mjs` et les composants de mouvement.
+  - **Trois erreurs de mesure trouvées et corrigées dans la sonde elle-même**, chacune donnant un chiffre faux mais crédible : octets décodés au lieu de compressés (budget trois fois trop gros), attente de démarrage à durée fixe (le travail unique tombait dans la fenêtre de mesure sur processeur bridé, d'où des écarts de 12 à 56 fps sur le même code), et défilement à la molette sur un profil mobile (un téléphone n'a pas de molette, et Lenis laisse la main au doigt).
+  - **Une optimisation essayée puis abandonnée** : fondre le grain dans le canvas d'ambiance, comme on l'a fait dans le shader 3D. `globalCompositeOperation` en canvas 2D est un mélange fait par le processeur à chaque image, là où `mix-blend-mode` est fait par le compositeur : 23 images par seconde au lieu de 56. La bonne réponse était de ne pas monter le calque du tout sous 768 px.
 
-**🚪 Porte 4** — défilement > 50 fps, JS ≤ 200 Ko gzip, reduced-motion toujours propre.
+**🚪 Porte 4 — FRANCHIE EN PARTIE** (20 septembre 2026)
+
+| Profil                    | Repos    | p95 repos | **Défilement**  | p95 défilement |
+| ------------------------- | -------- | --------- | --------------- | -------------- |
+| Bureau 1280×720 (avec 3D) | 60.2 fps | 17.0 ms   | **57.4 fps**    | 16.9 ms        |
+| Mobile milieu de gamme ×4 | 59.5 fps | 16.9 ms   | **52.9 fps**    | 33.4 ms        |
+| Mobile bas de gamme ×6    | 56.9 fps | 33.3 ms   | **29.3 fps** ❌ | 100 ms         |
+
+Mesure : `npm run perf`, machine au repos. Le critère du spec pour le défilement est
+« plus de 50 fps sur mobile milieu de gamme » ; le profil bas de gamme garde celui des
+portes précédentes, 30 fps. Aucune tâche longue au repos sur aucun profil.
+
+Reduced-motion : 15 tests e2e au vert (`motion.spec.ts`, `choregraphie.spec.ts`) —
+aucun canvas monté, aucun bloc masqué, **le moteur d'animation n'est même pas téléchargé**.
+
+❌ **Budget JavaScript non tenu : 239 Ko de chargement initial pour 39 Ko de dépassement**
+(critère : 200 Ko gzip), plus 190 Ko différés (three.js et GSAP).
+
+Ce n'est **pas** une régression de l'étape 4 : la même mesure sur le commit précédent donne
+236 Ko. La choréographie a ajouté 3 Ko au chargement initial — GSAP, ses 45 Ko, est
+entièrement différé. Le dépassement est structurel (React, Next, et les composants clients
+de l'atmosphère) et il attend l'analyse de bundle prévue en T8.8. **À traiter là, pas ici :
+le corriger demanderait de retirer des composants clients, ce qui est une décision de
+produit, pas une passe de performance.**
+
+⚠️ **Point ouvert : le défilement sur appareil très lent.** Sur le profil bridé ×6, la
+choréographie et le fond coûtent ensemble une vingtaine d'images par seconde — mesuré en
+désactivant l'un puis l'autre. Le remède est connu et déjà en place pour la 3D : ne rien
+monter du tout sur un appareil jugé modeste. Il n'est pas appliqué ici parce que le signal
+disponible (`appareilModeste()`) écarte _tous_ les écrans sous 1024 px, y compris de bons
+téléphones, et qu'aucun profil d'émulation ne permet de valider un critère plus fin sur
+cette machine. À reprendre à l'étape 8, avec un vrai appareil.
 
 ---
 

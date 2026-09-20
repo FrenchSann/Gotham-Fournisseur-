@@ -160,6 +160,56 @@ a {
   color: #fff;
 }
 
+/* ==========================================================================
+   Transitions de page — le volet
+   ========================================================================== */
+
+/* Le volet se ferme sur la page qui part, puis se rouvre sur celle qui arrive.
+   Les deux animations ne se chevauchent pas : le retard de la seconde vaut
+   exactement la durée de la première, sinon on voit les deux pages à la fois et
+   l'illusion du volet tombe.
+
+   250 + 350 = 600 ms, la valeur du spec. La fermeture est plus rapide que
+   l'ouverture : ce qui part doit libérer l'écran vite, ce qui arrive a le droit
+   de prendre son temps. */
+::view-transition-old(.volet) {
+  animation: volet-ferme 250ms var(--courbe-machine) both;
+}
+
+::view-transition-new(.volet) {
+  animation: volet-ouvre 350ms var(--courbe-atmo) 250ms both;
+}
+
+@keyframes volet-ferme {
+  to {
+    clip-path: inset(0 0 100% 0);
+  }
+}
+
+@keyframes volet-ouvre {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* La racine ne s'anime pas. Par défaut le navigateur fait un fondu croisé de
+   tout l'écran, qui se superposerait au volet et le brouillerait : on ne verrait
+   plus un volet mais un fondu vaguement vertical. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* Le calque de transition capte les clics pendant toute sa durée. Six cents
+   millisecondes de clics perdus, c'est assez pour qu'un visiteur pressé croie
+   que le site ne répond pas. */
+::view-transition {
+  pointer-events: none;
+}
+
 /* Filet de sécurité global : même si un composant oublie son repli,
    plus rien ne bouge quand l'utilisateur a demandé moins de mouvement.
    Les composants coupent leurs animations à la source (hook dédié) ;
@@ -172,5 +222,16 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Les pseudo-éléments de transition de page vivent en dehors du document :
+     aucun sélecteur universel ne les atteint, il faut les nommer. Sans ces
+     trois lignes, le volet continuerait de jouer sur un site où l'on a
+     justement demandé que plus rien ne bouge. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
   }
 }

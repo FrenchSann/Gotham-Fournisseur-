@@ -28,9 +28,12 @@ export function Etiquette({
 /** Numéro de section, façon sommaire de catalogue : 01, 02, 03. */
 export function NumeroSection({ n, titre }: { n: number; titre: string }) {
   return (
-    <div className="flex items-baseline gap-4 border-b border-steel-500 pb-4">
-      <Etiquette accent>{String(n).padStart(2, '0')}</Etiquette>
-      <Etiquette>{titre}</Etiquette>
+    <div>
+      <div className="flex items-baseline gap-4 pb-4">
+        <Etiquette accent>{String(n).padStart(2, '0')}</Etiquette>
+        <Etiquette>{titre}</Etiquette>
+      </div>
+      <Filet anime />
     </div>
   )
 }
@@ -38,12 +41,23 @@ export function NumeroSection({ n, titre }: { n: number; titre: string }) {
 /**
  * Filet horizontal.
  *
- * Animé au défilement à l'étape 4 : il se tracera depuis la gauche via
- * `scaleX`, jamais via `width` — animer une largeur force un recalcul de mise
- * en page à chaque image.
+ * Avec `anime`, il porte l'attribut que la choréographie retrouve au montage
+ * pour le faire se tracer depuis la gauche — en `scaleX`, jamais en `width` :
+ * animer une largeur force un recalcul de mise en page à chaque image, et il y
+ * a des dizaines de filets sur la page.
+ *
+ * L'attribut plutôt qu'un composant client : le filet reste un composant
+ * serveur, et c'est `Choregraphie` qui lui pose l'animation. Voir son en-tête
+ * pour la raison.
  */
-export function Filet({ className = '' }: { className?: string }) {
-  return <div className={`h-px w-full bg-steel-500 ${className}`} aria-hidden="true" />
+export function Filet({ className = '', anime = false }: { className?: string; anime?: boolean }) {
+  return (
+    <div
+      data-filet={anime ? '' : undefined}
+      className={`h-px w-full bg-steel-500 ${className}`}
+      aria-hidden="true"
+    />
+  )
 }
 
 type VarianteBouton = 'principal' | 'secondaire'
