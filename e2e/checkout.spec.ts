@@ -78,13 +78,20 @@ test.describe('bouton d’achat', () => {
   })
 
   test('redirige vers l’URL rendue par le serveur', async ({ page }) => {
-    await page.route('**/api/checkout', (route) =>
-      route.fulfill({
+    let appele = false
+
+    await page.route('**/api/checkout', (route) => {
+      // On arrête de cliquer dès que la requête est partie, et pas seulement
+      // quand l'URL a changé : un clic de plus pendant que la navigation
+      // s'amorce l'annule, et le test échoue alors uniquement quand la machine
+      // est chargée — c'est-à-dire en exécutant toute la suite.
+      appele = true
+      return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ url: 'https://example.test/paiement' }),
       })
-    )
+    })
     // La destination est hors du site : on l'arrête pour ne pas dépendre du
     // réseau, mais le fait d'y aller est ce qu'on vérifie.
     await page.route('https://example.test/**', (route) =>
@@ -92,7 +99,7 @@ test.describe('bouton d’achat', () => {
     )
 
     const bouton = await ouvrirLaFiche(page)
-    await cliquerJusquA(bouton, () => page.url().startsWith('https://example.test'))
+    await cliquerJusquA(bouton, () => appele)
 
     await expect(page).toHaveURL('https://example.test/paiement')
   })
