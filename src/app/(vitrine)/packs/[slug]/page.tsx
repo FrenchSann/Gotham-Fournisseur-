@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { VoletTransition } from '@/components/atmosphere/VoletTransition'
+import { BoutonAchat } from '@/components/BoutonAchat'
 import { EmplacementCaisse, Vitrine3D } from '@/components/catalogue/Vitrine3D'
 import { Choregraphie } from '@/components/motion/Choregraphie'
-import { BoutonLien, Caracteristique, Etiquette, Filet } from '@/components/ui/Primitives'
+import { Caracteristique, Etiquette, Filet } from '@/components/ui/Primitives'
 import { PACKS, trouverPack } from '@/content/packs'
 import { formaterMois, formaterPrix } from '@/content/types'
 
@@ -83,19 +84,10 @@ export default async function FichePack({ params }: PageProps<'/packs/[slug]'>) 
                   </p>
                   <Etiquette className="mt-1 block">TTC · {pack.formatFichier}</Etiquette>
 
-                  {/* Le bouton d'achat réel arrive à l'étape 5, avec la case de
-                      renonciation au droit de rétractation qui le débloque. */}
-                  <BoutonLien
-                    href="/#catalogue"
-                    reticule="Bientôt"
-                    className="mt-6 w-full"
-                    aria-disabled="true"
-                  >
-                    Acquérir le dossier
-                  </BoutonLien>
-                  <Etiquette className="mt-3 block text-center">
-                    Paiement sécurisé · Livraison immédiate
-                  </Etiquette>
+                  {/* La case de renonciation au droit de rétractation viendra
+                      conditionner ce bouton à l'étape 7 : tant qu'elle n'est
+                      pas cochée, aucune session ne doit pouvoir être créée. */}
+                  <BoutonAchat slug={pack.slug} className="mt-6" />
 
                   <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4">
                     <Caracteristique label="Fournisseurs" valeur={pack.fournisseurs} />

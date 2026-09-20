@@ -313,28 +313,52 @@ cette machine. À reprendre à l'étape 8, avec un vrai appareil.
   - Acceptation : CLI installée et authentifiée, 6 produits et prix créés en mode test, `stripePriceId` renseignés dans `packs.ts`.
   - Vérifier : `stripe products list` affiche les 6 produits.
   - Fichiers : `src/content/packs.ts`.
+  - ⚠️ **Bloqué : il n'y a pas de clé Stripe utilisable sur cette machine.** `.env.local` contient des valeurs de remplacement (27 caractères ; une vraie clé de test en fait une centaine), et le connecteur Stripe n'est pas autorisé. Rien ne peut être créé sur le compte tant que ce n'est pas le cas.
+  - **Ce n'est pas bloquant pour le reste de l'étape** : la route de paiement décrit le prix à la volée depuis le catalogue (`price_data`) quand `stripePriceId` est nul, et bascule d'elle-même sur le prix Stripe le jour où il existe. Le montant vient du catalogue dans les deux cas.
 
-- [ ] **T5.2 — Client Stripe serveur**
-  - Acceptation : instance unique, version d'API épinglée, `import 'server-only'` pour interdire toute importation côté client.
-  - Vérifier : une tentative d'import dans un composant client fait échouer le build.
-  - Fichiers : `src/lib/stripe.ts`.
+- [x] **T5.2 — Client Stripe serveur**
+  - Fait : instance unique et paresseuse, version d'API épinglée sur `2026-08-26.dahlia`, `import 'server-only'` en première ligne, deux reprises réseau.
+  - Fichiers : `src/lib/stripe.ts`, `package.json` (`stripe`, `server-only`).
 
-- [ ] **T5.3 — Route de création de session — TDD**
-  - Acceptation : `POST /api/checkout` accepte **uniquement** un `slug`. Montant et devise proviennent du catalogue serveur. Slug inconnu → 400. Un montant envoyé par le client est ignoré.
-  - Vérifier : test écrit en premier, avec le cas « le client envoie `prixCentimes: 1` » → le montant débité reste celui du catalogue.
-  - Fichiers : `src/app/api/checkout/route.ts`, `tests/api/checkout.test.ts`.
+- [x] **T5.3 — Route de création de session — TDD**
+  - Fait : `POST /api/checkout` n'accepte qu'un `slug` ; le schéma Zod écarte silencieusement tout autre champ. Montant, devise et libellé viennent du catalogue. TVA en `tax_behavior: 'inclusive'` — le site affiche des prix TTC, et ajouter la TVA par-dessus serait illégal autant que malhonnête. Erreurs Stripe journalisées côté serveur, message neutre côté client.
+  - Vérifié : **9 tests écrits avant la route**, dont celui qui justifie le fichier — un client qui envoie `prixCentimes: 1`, `currency: 'usd'` et ses propres `line_items` est débité du prix du catalogue, en euros.
+  - Fichiers : `src/app/api/checkout/route.ts`, `tests/api/checkout.test.ts`, `vitest.config.mts` (variables d'environnement factices).
 
-- [ ] **T5.4 — Bouton d'achat**
-  - Acceptation : état de chargement, désactivé pendant la requête, message d'erreur neutre en cas d'échec, redirection vers Stripe. Mention « Commande avec obligation de paiement ».
-  - Vérifier : parcours manuel jusqu'à la page Stripe.
-  - Fichiers : `src/components/BoutonAchat.tsx`.
+- [x] **T5.4 — Bouton d'achat**
+  - Fait : trois états (repos, requête en cours, échec), mention « Commander avec obligation de paiement » exigée par l'article L221-14, message d'échec disant ce qui compte — _rien n'a été débité_ — annoncé en `role="alert"`. Le bouton reste désactivé pendant la redirection : il n'y a rien à cliquer deux fois.
+  - Vérifié : 8 tests e2e (Stripe intercepté) — la requête ne contient **que** le slug, la redirection part, l'échec ne quitte pas la page.
+  - Fichiers : `src/components/BoutonAchat.tsx`, `e2e/checkout.spec.ts`.
 
-- [ ] **T5.5 — Page de remerciement**
-  - Acceptation : dans le groupe `(transaction)`, aucune atmosphère, message clair « votre email arrive dans la minute », rappel de vérifier les spams. **Ne livre rien.**
-  - Vérifier : `/merci` ne contient aucun canvas ; aucune requête de fichier.
+- [x] **T5.5 — Page de remerciement**
+  - Fait : dans le groupe `(transaction)`, aucune couche d'ambiance, `robots: noindex`, référence de transaction affichée **sans être vérifiée auprès de Stripe** — elle sert à citer une commande au support, pas à attester d'un paiement. Page lisible même sans paramètre, parce que l'URL est devinable.
+  - Vérifié : 8 tests e2e — zéro canvas, aucune requête de fichier, contenu correct avec et sans référence.
   - Fichiers : `src/app/(transaction)/merci/page.tsx`.
 
-**🚪 Porte 5** — paiement test abouti avec la carte `4242 4242 4242 4242`, montant falsifié rejeté.
+**🚪 Porte 5 — FRANCHIE EN PARTIE** (20 septembre 2026)
+
+| Critère de la porte                      | État                                          |
+| ---------------------------------------- | --------------------------------------------- |
+| Montant falsifié rejeté                  | ✅ Prouvé par test, écrit avant la route      |
+| Paiement test avec `4242 4242 4242 4242` | ⛔ **Impossible sans clé Stripe** — voir T5.1 |
+
+Le tunnel est complet et testé de bout en bout **jusqu'à la frontière de Stripe** :
+17 tests (9 unitaires, 8 e2e) couvrent la création de session, le refus d'un slug inconnu,
+le refus d'un corps illisible, l'échec de Stripe, la redirection et la page de
+remerciement. Ce qui manque n'est pas du code : c'est un compte joignable.
+
+**Ce qu'il te reste à faire pour franchir la porte entièrement** :
+
+1. Récupérer les clés de test dans le tableau de bord Stripe (Développeurs > Clés API) et
+   remplacer dans `.env.local` les valeurs de remplacement de `STRIPE_SECRET_KEY` et
+   `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
+2. Activer **Stripe Tax** sur le compte (Paramètres > Taxes). La route demande
+   `automatic_tax`, et sans activation Stripe refuse la session — volontairement : mieux
+   vaut un refus net qu'une TVA silencieusement fausse sur une vente réelle.
+3. Relancer `npm run dev`, ouvrir une fiche, payer avec `4242 4242 4242 4242`.
+
+Le reste de l'étape 5 est livré ; T5.1 (les six produits Stripe) suivra dans la foulée,
+et `packs.ts` est prêt à les recevoir.
 
 ---
 
