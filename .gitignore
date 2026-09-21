@@ -49,3 +49,8 @@ next-env.d.ts
 
 # Captures locales
 /captures/
+
+# graphify
+/graphify-out/
+
+.vercel
